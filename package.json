@@ -1,0 +1,38 @@
+{
+  "name": "repoflux",
+  "version": "1.0.0",
+  "description": "Lightning-fast, AST-aware repository bundler and live MCP context server for AI pair programming",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "repoflux": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "start": "node dist/cli.js",
+    "test": "node --test dist/**/*.test.js"
+  },
+  "keywords": [
+    "ai",
+    "llm",
+    "codex",
+    "mcp",
+    "context",
+    "prompt",
+    "codebase",
+    "repomix",
+    "token-optimizer",
+    "cursor",
+    "claude"
+  ],
+  "author": "apple sauce",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
