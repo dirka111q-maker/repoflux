@@ -202,7 +202,7 @@ async function main() {
   }
 
   if (args.version) {
-    console.log('1.2.0');
+    console.log('1.2.1');
     process.exit(0);
   }
 
