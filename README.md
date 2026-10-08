@@ -79,9 +79,41 @@ npm install -g repoflux
 
 ---
 
+## OpenAI Codex & ChatGPT Integration
+
+repoflux compiles structured codebase context optimized for OpenAI models (GPT-4o, o1, o3, Codex):
+
+### Web & CLI Pair Programming
+Generate a sanitized, token-budgeted prompt bundle directly to clipboard and paste into ChatGPT Pro / Codex:
+
+```bash
+# Bundle whole repo and copy to clipboard
+npx repoflux -c
+
+# Pass symbol outlines for fast architectural review
+npx repoflux -s -c
+```
+
+### GitHub Actions PR Review Bot with OpenAI
+Automate incoming pull request reviews in CI using repoflux and the OpenAI API:
+
+```yaml
+- name: Bundle Changed Files
+  run: npx repoflux -d -f markdown -o pr_context.md
+
+- name: Run Codex Review
+  run: |
+    curl https://api.openai.com/v1/chat/completions \
+      -H "Authorization: Bearer ${{ secrets.OPENAI_API_KEY }}" \
+      -H "Content-Type: application/json" \
+      -d "{\"model\": \"gpt-4o\", \"messages\": [{\"role\": \"user\", \"content\": \"Review this pull request diff: $(cat pr_context.md)\"}]}"
+```
+
+---
+
 ## Model Context Protocol (MCP) Configuration
 
-Add repoflux to `claude_desktop_config.json` or your Cursor MCP settings:
+For agentic IDEs (Cursor, Claude Desktop, and MCP-compatible coding agents), connect repoflux as a native stdio server:
 
 ```json
 {
