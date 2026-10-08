@@ -5,6 +5,9 @@ import * as path from 'node:path';
 import { sanitizeSecrets } from './secrets.js';
 import { estimateTokens } from './tokenizer.js';
 import { packRepository } from './packer.js';
+import { extractSymbols } from './symbols.js';
+import { detectDependencies } from './deps.js';
+import { generateHtmlReport } from './html.js';
 
 test('sanitizeSecrets masks API keys correctly', () => {
   const sample = 'const key = "sk-1234567890abcdef1234567890abcdef";';
@@ -53,4 +56,29 @@ test('IgnoreFilter respects .repofluxignore', async () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('extractSymbols parses functions and classes from code', () => {
+  const tsCode = 'export function addNumbers(a: number, b: number) { return a + b; }\nexport class Calculator {}';
+  const { symbols } = extractSymbols('math.ts', tsCode);
+
+  assert.strictEqual(symbols.length, 2);
+  assert.strictEqual(symbols[0].name, 'addNumbers');
+  assert.strictEqual(symbols[0].kind, 'function');
+  assert.strictEqual(symbols[1].name, 'Calculator');
+  assert.strictEqual(symbols[1].kind, 'class');
+});
+
+test('detectDependencies parses package.json correctly', () => {
+  const overviews = detectDependencies(process.cwd());
+  assert.ok(overviews.length > 0);
+  assert.strictEqual(overviews[0].ecosystem, 'Node / JavaScript');
+});
+
+test('generateHtmlReport creates self-contained HTML', async () => {
+  const packed = await packRepository({ rootDir: process.cwd(), maxTokens: 100 });
+  const html = generateHtmlReport(packed, 'test-repo');
+  assert.ok(html.includes('<!DOCTYPE html>'));
+  assert.ok(html.includes('repoflux Context Report: test-repo'));
+});
+
 

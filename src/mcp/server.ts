@@ -1,6 +1,8 @@
 import * as readline from 'node:readline';
 import { packRepository } from '../core/packer.js';
 import { sanitizeSecrets } from '../core/secrets.js';
+import { getRepositoryDiff } from '../core/gitdiff.js';
+import { detectDependencies, formatDependencies } from '../core/deps.js';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
@@ -105,6 +107,36 @@ export function startMcpServer(targetDir: string = process.cwd()) {
                   },
                 },
               },
+              {
+                name: 'get_symbol_outline',
+                description: 'Extract functions, classes, interfaces, and exported symbols without loading full file bodies',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    dir: { type: 'string', description: 'Directory to inspect' },
+                  },
+                },
+              },
+              {
+                name: 'get_git_diff',
+                description: 'Get current uncommitted changes or recent diff for pull request code review',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    dir: { type: 'string', description: 'Repository directory' },
+                  },
+                },
+              },
+              {
+                name: 'get_dependencies',
+                description: 'Inspect dependencies across Node, Python, Rust, and Go manifests',
+                inputSchema: {
+                  type: 'object',
+                  properties: {
+                    dir: { type: 'string', description: 'Repository directory' },
+                  },
+                },
+              },
             ],
           });
           break;
@@ -152,6 +184,39 @@ export function startMcpServer(targetDir: string = process.cwd()) {
                 {
                   type: 'text',
                   text: report,
+                },
+              ],
+            });
+          } else if (toolName === 'get_symbol_outline') {
+            const packed = await packRepository({ rootDir: workDir, outlineOnly: true });
+            sendResult(id, {
+              content: [
+                {
+                  type: 'text',
+                  text: packed.output,
+                },
+              ],
+            });
+          } else if (toolName === 'get_git_diff') {
+            const diffResult = getRepositoryDiff(workDir);
+            const report = diffResult.hasDiff
+              ? `Branch: ${diffResult.branch}\nFiles changed: ${diffResult.filesChanged.join(', ')}\n\n${diffResult.diffContent}`
+              : `Branch: ${diffResult.branch}\nWorking tree clean (no uncommitted diff).`;
+            sendResult(id, {
+              content: [
+                {
+                  type: 'text',
+                  text: report,
+                },
+              ],
+            });
+          } else if (toolName === 'get_dependencies') {
+            const overviews = detectDependencies(workDir);
+            sendResult(id, {
+              content: [
+                {
+                  type: 'text',
+                  text: formatDependencies(overviews),
                 },
               ],
             });

@@ -5,6 +5,8 @@ import { estimateTokens } from './tokenizer.js';
 import { sanitizeSecrets, SecretMatch } from './secrets.js';
 import { generateAsciiTree, FileEntrySummary } from './tree.js';
 
+import { extractSymbols, formatOutline } from './symbols.js';
+
 export type OutputFormat = 'markdown' | 'xml' | 'json';
 
 export interface PackOptions {
@@ -14,6 +16,9 @@ export interface PackOptions {
   redactSecrets?: boolean;
   customIgnores?: string[];
   includePatterns?: string[];
+  outlineOnly?: boolean;
+  prependPrompt?: string;
+  diffFiles?: string[];
 }
 
 export interface PackResult {
@@ -93,17 +98,40 @@ export async function packRepository(options: PackOptions): Promise<PackResult> 
 
   scan(rootDir);
 
-  // Sort files predictably
-  packedFiles.sort((a, b) => a.relPath.localeCompare(b.relPath));
-  fileSummaries.sort((a, b) => a.relPath.localeCompare(b.relPath));
+  // Filter by diff if diffFiles provided
+  let filesToProcess = packedFiles;
+  if (options.diffFiles && options.diffFiles.length > 0) {
+    const normDiffs = new Set(options.diffFiles.map((f) => f.replace(/\\/g, '/')));
+    filesToProcess = packedFiles.filter((f) => normDiffs.has(f.relPath.replace(/\\/g, '/')));
+  }
 
   const tree = generateAsciiTree(fileSummaries);
+
+  // If outlineOnly, extract symbols instead of full content
+  if (options.outlineOnly) {
+    const outlines = filesToProcess.map((f) => extractSymbols(f.relPath, f.content));
+    const outlineOutput = formatOutline(outlines);
+    return {
+      output: options.prependPrompt ? `${options.prependPrompt}\n\n${outlineOutput}` : outlineOutput,
+      totalFiles: filesToProcess.length,
+      totalTokens: estimateTokens(outlineOutput),
+      totalBytes: Buffer.byteLength(outlineOutput, 'utf8'),
+      tree,
+      secretDetections,
+      budgetExceeded: false,
+    };
+  }
+
+  // Sort files predictably
+  filesToProcess.sort((a, b) => a.relPath.localeCompare(b.relPath));
+  fileSummaries.sort((a, b) => a.relPath.localeCompare(b.relPath));
+
   let currentTokenCount = estimateTokens(tree);
   let totalBytes = 0;
   let budgetExceeded = false;
-  const includedFiles: typeof packedFiles = [];
+  const includedFiles: typeof filesToProcess = [];
 
-  for (const file of packedFiles) {
+  for (const file of filesToProcess) {
     totalBytes += Buffer.byteLength(file.content, 'utf8');
     if (currentTokenCount + file.tokens > maxTokens) {
       budgetExceeded = true;
@@ -134,6 +162,10 @@ export async function packRepository(options: PackOptions): Promise<PackResult> 
     );
   } else {
     output = formatMarkdown(rootDir, tree, includedFiles, budgetExceeded, maxTokens);
+  }
+
+  if (options.prependPrompt) {
+    output = `${options.prependPrompt}\n\n${output}`;
   }
 
   return {

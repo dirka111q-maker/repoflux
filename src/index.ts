@@ -4,4 +4,8 @@ export { estimateTokens, analyzeContent, TokenStats } from './core/tokenizer.js'
 export { generateAsciiTree, FileEntrySummary } from './core/tree.js';
 export { IgnoreFilter } from './core/ignore.js';
 export { copyToClipboard } from './core/clipboard.js';
+export { extractSymbols, formatOutline, SymbolOutline } from './core/symbols.js';
+export { getRepositoryDiff, GitDiffResult } from './core/gitdiff.js';
+export { detectDependencies, formatDependencies, DependencyOverview } from './core/deps.js';
+export { generateHtmlReport } from './core/html.js';
 export { startMcpServer } from './mcp/server.js';

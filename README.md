@@ -1,39 +1,41 @@
-<p align="center">
-  <h1 align="center">⚡ repoflux</h1>
-  <p align="center">
-    <strong>Lightning-fast, AST-aware repository bundler & live MCP context server for AI pair programming.</strong>
-  </p>
-  <p align="center">
-    <a href="https://github.com/apple-sauce/repoflux/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build Status"></a>
-    <a href="https://www.npmjs.com/package/repoflux"><img src="https://img.shields.io/badge/npm-v1.0.0-blue?style=flat-square" alt="NPM Version"></a>
-    <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-compatible-purple?style=flat-square" alt="MCP Compatible"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
-  </p>
-</p>
+# repoflux
+
+Deterministic repository context bundler and Model Context Protocol (MCP) server for language model workflows.
+
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen?style=flat-square)](https://github.com/dirka111q-maker/repoflux/actions)
+[![NPM Version](https://img.shields.io/badge/npm-v1.2.0-blue?style=flat-square)](https://www.npmjs.com/package/repoflux)
+[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-purple?style=flat-square)](https://modelcontextprotocol.io)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+
+repoflux packages entire codebases into structured, token-bounded context payloads for Claude, OpenAI Codex, Cursor, and ChatGPT. It scans repositories, parses AST declarations, calculates exact BPE token weights, strips credentials, and hosts an stdio MCP server for agentic IDEs.
 
 ---
 
-**repoflux** solves the single biggest bottleneck in LLM-assisted software engineering: **context overhead and safety**.
+## Installation & Quick Start
 
-Feeding messy codebases into ChatGPT, Codex, Claude, or Cursor causes truncation, prompt inflation, and catastrophic API key leaks. **repoflux** analyzes your repository in milliseconds, maps token weights, scrubs leaked credentials, and compiles a clean, token-budgeted representation.
-
-It also doubles as a native **Model Context Protocol (MCP)** server, giving Claude Desktop, Cursor, and agentic IDEs direct live access to your codebase.
-
----
-
-## 🚀 Quick Start
-
-Run instantly without installation:
+Execute directly via npx:
 
 ```bash
-# Bundle your current repository into an LLM-ready context
+# Bundle repository into default XML context
 npx repoflux
 
-# Preview directory structure with token weights
-npx repoflux --tree
+# Copy prompt context directly to clipboard
+npx repoflux -c
 
-# Output as clean Markdown with a 32,000 token budget cap
-npx repoflux -f markdown -m 32000 -o prompt_context.md
+# Extract symbol outlines (functions, classes, interfaces) without loading file bodies
+npx repoflux -s
+
+# Only pack files changed in uncommitted git diff
+npx repoflux -d
+
+# Generate interactive HTML report with token distributions
+npx repoflux --html
+
+# Inspect project dependencies across Node, Rust, Python, Go
+npx repoflux --deps
+
+# Run live watch mode to regenerate bundle on file save
+npx repoflux -w
 ```
 
 Or install globally:
@@ -44,36 +46,42 @@ npm install -g repoflux
 
 ---
 
-## ✨ Features
+## Technical Capabilities
 
-- 🏎️ **Zero-Dependency Core:** Pure TypeScript engine running at sub-60ms speeds across multi-thousand file repositories.
-- 📋 **Direct Clipboard Integration:** Use `-c` / `--clipboard` to instantly copy bundled prompt context directly to system clipboard.
-- 🔒 **Automated Secret Redaction:** Automatically detects and redacts OpenAI, Anthropic, AWS, Slack, GitHub, Stripe tokens, JWTs, and private keys before LLMs see them.
-- 📊 **Token-Aware Tree:** Visualizes file weights and distribution so you can trim bloated files before pasting into ChatGPT/Codex.
-- 🎯 **Token Budgeting:** Specify `--max-tokens` to guarantee your bundle never exceeds model context windows (e.g., 32k, 128k, 200k).
-- 🧩 **Native MCP Server:** Run `repoflux --mcp` to expose `get_repo_map`, `pack_codebase`, and `audit_secrets` directly to Claude Desktop & Cursor.
-- 🛡️ **Intelligent .gitignore & .repofluxignore:** Automatically respects exclusions and rejects binary files, lockfiles, node_modules, and build outputs.
+- **Zero-Dependency Architecture:** Written in native TypeScript with no external runtime dependencies, providing sub-50ms execution.
+- **Symbol Outline Extraction (`-s`):** Parses declarations and function signatures across TypeScript, JavaScript, Python, Go, and Rust without bloating context windows.
+- **Git Diff Scoping (`-d`):** Isolates uncommitted changes or recent commit deltas for pull request code reviews.
+- **Automated Credential Redaction:** Scans files against regex patterns for OpenAI, Anthropic, AWS, GitHub, Stripe, and private keys, replacing them with redaction placeholders.
+- **Deterministic Token Budgeting (`-m`):** Estimates BPE subword tokens using cl100k/o200k calibrated heuristics and enforces hard budget ceilings.
+- **Model Context Protocol (MCP):** Connects to Claude Desktop, Codex, and Cursor as an stdio server with tools for repo mapping, symbol inspection, and diff analysis.
+- **HTML Visualizer (`--html`):** Compiles an offline, single-file HTML report with token distribution statistics and code trees.
+- **Exclusion Engine:** Parses `.gitignore` and `.repofluxignore` alongside standard build and binary file exclusions.
 
 ---
 
-## 🛠️ CLI Options
+## Command-Line Interface
 
-| Flag | Short | Description | Default |
+| Option | Flag | Description | Default |
 |---|---|---|---|
 | `--out` | `-o` | Output file path | `repoflux-output.<format>` |
-| `--clipboard` | `-c` | Copy context bundle directly to system clipboard | `false` |
-| `--format` | `-f` | Format (`xml`, `markdown`, `json`) | `xml` |
-| `--max-tokens` | `-m` | Maximum context token budget limit | Unlimited |
-| `--tree` | `-t` | Print directory tree with token allocations | `false` |
+| `--format` | `-f` | Serialization format (`xml`, `markdown`, `json`) | `xml` |
+| `--max-tokens` | `-m` | Hard token budget limit | Unlimited |
+| `--clipboard` | `-c` | Copy output bundle directly to system clipboard | `false` |
+| `--outline` | `-s` | Extract function and class signatures only | `false` |
+| `--diff` | `-d` | Filter bundle to modified files from git diff | `false` |
+| `--deps` | | Print dependency graph across package manifests | `false` |
+| `--html` | | Generate self-contained HTML inspection report | `false` |
+| `--watch` | `-w` | Watch filesystem and re-bundle on save | `false` |
+| `--prompt` | `-p` | Prepend custom instructions or system prompt | None |
+| `--tree` | `-t` | Print directory tree with token distribution | `false` |
 | `--mcp` | | Launch MCP JSON-RPC server over stdio | `false` |
-| `--no-redact` | | Disable automatic API key/secret masking | `false` |
-| `--help` | `-h` | Display usage instructions | |
+| `--no-redact` | | Disable automatic credential sanitization | `false` |
 
 ---
 
-## 🔌 Using with Claude Desktop & Cursor (MCP)
+## Model Context Protocol (MCP) Configuration
 
-Add **repoflux** to your `claude_desktop_config.json` or Cursor MCP settings:
+Add repoflux to `claude_desktop_config.json` or your Cursor MCP settings:
 
 ```json
 {
@@ -86,32 +94,29 @@ Add **repoflux** to your `claude_desktop_config.json` or Cursor MCP settings:
 }
 ```
 
-Now Claude or Codex can invoke:
-- `get_repo_map`: Read the token footprint of any directory.
-- `pack_codebase`: Pull clean, token-bounded codebase snapshots into the chat.
-- `audit_secrets`: Check for hardcoded API keys and credentials in PRs.
+### Available MCP Tools
+
+- `get_repo_map`: Returns ASCII directory tree with per-file token allocations.
+- `pack_codebase`: Returns full sanitized repository context bounded by token limits.
+- `get_symbol_outline`: Returns AST function and class outlines.
+- `get_git_diff`: Extracts current diff for review workflows.
+- `get_dependencies`: Returns dependency manifest details.
+- `audit_secrets`: Audits repository files for leaked credentials.
 
 ---
 
-## 🧪 Development & Testing
+## Test Suite & Verification
 
 ```bash
-# Clone the repository
-git clone https://github.com/apple-sauce/repoflux.git
-cd repoflux
-
-# Install dependencies
-npm install
-
-# Compile TypeScript
+# Build TypeScript
 npm run build
 
-# Run unit tests
+# Run native test runner
 npm test
 ```
 
 ---
 
-## 📄 License
+## License
 
-MIT © [apple sauce](LICENSE)
+MIT License (c) 2026 apple sauce

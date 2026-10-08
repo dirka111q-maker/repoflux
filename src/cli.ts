@@ -5,6 +5,9 @@ import * as path from 'node:path';
 import { packRepository, OutputFormat } from './core/packer.js';
 import { startMcpServer } from './mcp/server.js';
 import { copyToClipboard } from './core/clipboard.js';
+import { getRepositoryDiff } from './core/gitdiff.js';
+import { detectDependencies, formatDependencies } from './core/deps.js';
+import { generateHtmlReport } from './core/html.js';
 
 interface CliArgs {
   targetDir: string;
@@ -12,6 +15,12 @@ interface CliArgs {
   format: OutputFormat;
   maxTokens?: number;
   treeOnly: boolean;
+  outlineOnly: boolean;
+  diffOnly: boolean;
+  depsOnly: boolean;
+  htmlReport: boolean;
+  watchMode: boolean;
+  prependPrompt?: string;
   clipboard: boolean;
   mcp: boolean;
   noSecretsRedaction: boolean;
@@ -24,6 +33,11 @@ function parseArgs(args: string[]): CliArgs {
     targetDir: '.',
     format: 'xml',
     treeOnly: false,
+    outlineOnly: false,
+    diffOnly: false,
+    depsOnly: false,
+    htmlReport: false,
+    watchMode: false,
     clipboard: false,
     mcp: false,
     noSecretsRedaction: false,
@@ -42,10 +56,22 @@ function parseArgs(args: string[]): CliArgs {
       result.mcp = true;
     } else if (arg === '--tree' || arg === '-t') {
       result.treeOnly = true;
+    } else if (arg === '--outline' || arg === '-s') {
+      result.outlineOnly = true;
+    } else if (arg === '--diff' || arg === '-d') {
+      result.diffOnly = true;
+    } else if (arg === '--deps') {
+      result.depsOnly = true;
+    } else if (arg === '--html') {
+      result.htmlReport = true;
+    } else if (arg === '--watch' || arg === '-w') {
+      result.watchMode = true;
     } else if (arg === '--clipboard' || arg === '-c') {
       result.clipboard = true;
     } else if (arg === '--no-redact') {
       result.noSecretsRedaction = true;
+    } else if (arg === '--prompt' || arg === '-p') {
+      result.prependPrompt = args[++i];
     } else if (arg === '--format' || arg === '-f') {
       const val = args[++i];
       if (val === 'xml' || val === 'markdown' || val === 'json') {
@@ -66,29 +92,105 @@ function parseArgs(args: string[]): CliArgs {
 
 function printHelp() {
   console.log(`
-\x1b[1m\x1b[36m⚡ repoflux\x1b[0m — High-speed repo bundler & MCP context engine for LLMs
+\x1b[1mrepoflux\x1b[0m — Codebase Context Bundler & MCP Stdio Server
 
-\x1b[1mUSAGE:\x1b[0m
+USAGE:
   $ npx repoflux [path] [options]
 
-\x1b[1mOPTIONS:\x1b[0m
+CORE OPTIONS:
   -o, --out <file>        Save output to file (default: repoflux-output.<format>)
   -f, --format <format>   Output format: xml, markdown, json (default: xml)
   -m, --max-tokens <num>  Cap context budget at N tokens
+  -c, --clipboard         Copy generated context directly to system clipboard
+  -p, --prompt <text>     Prepend custom prompt instructions to bundle
+
+ANALYSIS & MODES:
+  -s, --outline           Extract symbol outline (functions, classes, exports)
+  -d, --diff              Only bundle files modified in uncommitted git diff
+      --deps              Print dependency graph across Node, Rust, Python, Go
+      --html              Generate standalone interactive HTML report
   -t, --tree              Only generate directory tree with token distribution
-  -c, --clipboard         Copy generated context directly to clipboard
-      --mcp               Run as a Model Context Protocol stdio server for Claude/Cursor
+  -w, --watch             Watch directory and re-bundle on file modification
+      --mcp               Run as Model Context Protocol stdio server for LLMs
       --no-redact         Disable automatic secret / API key redaction
+
+GENERAL:
   -h, --help              Show help information
   -v, --version           Show version
-
-\x1b[1mEXAMPLES:\x1b[0m
-  $ npx repoflux                     # Bundle current repo into repoflux-output.xml
-  $ npx repoflux -c                  # Bundle and copy directly to clipboard
-  $ npx repoflux --tree              # Inspect token footprint per file
-  $ npx repoflux -f markdown -o ctx.md # Pack as clean Markdown
-  $ npx repoflux --mcp               # Connect to Claude Desktop or Cursor MCP
 `);
+}
+
+async function runBundler(args: CliArgs) {
+  const targetPath = path.resolve(args.targetDir);
+
+  if (args.depsOnly) {
+    const deps = detectDependencies(targetPath);
+    console.log(formatDependencies(deps));
+    return;
+  }
+
+  let diffFiles: string[] | undefined;
+  if (args.diffOnly) {
+    const diff = getRepositoryDiff(targetPath);
+    if (!diff.hasDiff) {
+      console.log('No uncommitted git changes detected.');
+      return;
+    }
+    diffFiles = diff.filesChanged;
+    console.log(`Bundling ${diffFiles.length} files from git diff.`);
+  }
+
+  const start = Date.now();
+  const result = await packRepository({
+    rootDir: targetPath,
+    format: args.format,
+    maxTokens: args.maxTokens,
+    redactSecrets: !args.noSecretsRedaction,
+    outlineOnly: args.outlineOnly,
+    diffFiles,
+    prependPrompt: args.prependPrompt,
+  });
+  const elapsed = Date.now() - start;
+
+  if (args.treeOnly) {
+    console.log('\nDirectory Structure & Token Weight:\n');
+    console.log(result.tree);
+    console.log(`\nAnalyzed ${result.totalFiles} files in ${elapsed}ms`);
+    return;
+  }
+
+  if (result.secretDetections.length > 0) {
+    console.log(`Notice: Redacted credentials in ${result.secretDetections.length} files`);
+  }
+
+  if (args.htmlReport) {
+    const htmlOut = args.outputFile || 'repoflux-report.html';
+    const htmlContent = generateHtmlReport(result, path.basename(targetPath));
+    fs.writeFileSync(path.resolve(htmlOut), htmlContent, 'utf8');
+    console.log(`Generated HTML report in ${htmlOut} (${(Buffer.byteLength(htmlContent, 'utf8') / 1024).toFixed(1)} KB)`);
+    return;
+  }
+
+  const ext = args.format === 'markdown' ? 'md' : args.format;
+  const outPath = path.resolve(args.outputFile || `repoflux-output.${ext}`);
+
+  fs.writeFileSync(outPath, result.output, 'utf8');
+
+  console.log(`Bundled ${result.totalFiles} files into ${path.basename(outPath)} (${(result.totalBytes / 1024).toFixed(1)} KB)`);
+  console.log(`Estimated context size: ~${result.totalTokens.toLocaleString()} tokens`);
+
+  if (args.clipboard) {
+    const copied = await copyToClipboard(result.output);
+    if (copied) {
+      console.log('Copied context bundle to clipboard.');
+    }
+  }
+
+  console.log(`Completed in ${elapsed}ms`);
+
+  if (result.budgetExceeded) {
+    console.log(`Notice: Context truncated to stay within max token budget (${args.maxTokens})`);
+  }
 }
 
 async function main() {
@@ -100,7 +202,7 @@ async function main() {
   }
 
   if (args.version) {
-    console.log('1.1.0');
+    console.log('1.2.0');
     process.exit(0);
   }
 
@@ -109,54 +211,28 @@ async function main() {
     return;
   }
 
-  const targetPath = path.resolve(args.targetDir);
-  console.log(`\x1b[36m⚡ Analyzing codebase:\x1b[0m ${targetPath}`);
+  if (args.watchMode) {
+    console.log(`Watching directory for changes: ${path.resolve(args.targetDir)}`);
+    await runBundler(args);
 
-  const start = Date.now();
-  const result = await packRepository({
-    rootDir: targetPath,
-    format: args.format,
-    maxTokens: args.maxTokens,
-    redactSecrets: !args.noSecretsRedaction,
-  });
-  const elapsed = Date.now() - start;
-
-  if (args.treeOnly) {
-    console.log('\n\x1b[1mDirectory Structure & Token Weight:\x1b[0m\n');
-    console.log(result.tree);
-    console.log(`\n\x1b[32m✔ Analyzed ${result.totalFiles} files in ${elapsed}ms\x1b[0m`);
+    let debounceTimer: NodeJS.Timeout | null = null;
+    fs.watch(path.resolve(args.targetDir), { recursive: true }, (_eventType, filename) => {
+      if (!filename || filename.includes('repoflux-output') || filename.includes('dist') || filename.includes('.git')) {
+        return;
+      }
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        console.log(`\nChange detected in ${filename}. Re-bundling...`);
+        runBundler(args).catch(console.error);
+      }, 300);
+    });
     return;
   }
 
-  if (result.secretDetections.length > 0) {
-    console.log(`\x1b[33m⚠️ Redacted ${result.secretDetections.length} secrets/credentials for security\x1b[0m`);
-  }
-
-  const ext = args.format === 'markdown' ? 'md' : args.format;
-  const outPath = path.resolve(args.outputFile || `repoflux-output.${ext}`);
-
-  fs.writeFileSync(outPath, result.output, 'utf8');
-
-  console.log(`\x1b[32m✔ Bundled ${result.totalFiles} files into \x1b[1m${path.basename(outPath)}\x1b[0m (${(result.totalBytes / 1024).toFixed(1)} KB)`);
-  console.log(`\x1b[36m📊 Estimated context size:\x1b[0m ~${result.totalTokens.toLocaleString()} tokens`);
-
-  if (args.clipboard) {
-    const copied = await copyToClipboard(result.output);
-    if (copied) {
-      console.log(`\x1b[35m📋 Copied context directly to system clipboard!\x1b[0m`);
-    } else {
-      console.log(`\x1b[33m⚠️ Could not access system clipboard\x1b[0m`);
-    }
-  }
-
-  console.log(`\x1b[90m⏱ Completed in ${elapsed}ms\x1b[0m`);
-
-  if (result.budgetExceeded) {
-    console.log(`\x1b[33m⚠️ Context truncated to stay within max token budget (${args.maxTokens})\x1b[0m`);
-  }
+  await runBundler(args);
 }
 
 main().catch((err) => {
-  console.error('\x1b[31mError:\x1b[0m', err.message);
+  console.error('Error:', err.message);
   process.exit(1);
 });
