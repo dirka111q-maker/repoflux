@@ -7,7 +7,7 @@ Deterministic repository context bundler and Model Context Protocol (MCP) server
 [![MCP Compatible](https://img.shields.io/badge/MCP-compatible-purple?style=flat-square)](https://modelcontextprotocol.io)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
 
-repoflux packages entire codebases into structured, token-bounded context payloads for Claude, OpenAI Codex, Cursor, and ChatGPT. It scans repositories, parses AST declarations, calculates exact BPE token weights, strips credentials, and hosts an stdio MCP server for agentic IDEs.
+repoflux packages entire codebases into structured, token-bounded context payloads for OpenAI Codex, ChatGPT, Cursor, and autonomous coding agents. It scans repositories, parses AST declarations, calculates exact BPE token weights, strips credentials, and hosts an stdio MCP server for agentic IDEs.
 
 ---
 
@@ -53,7 +53,7 @@ npm install -g repoflux
 - **Git Diff Scoping (`-d`):** Isolates uncommitted changes or recent commit deltas for pull request code reviews.
 - **Automated Credential Redaction:** Scans files against regex patterns for OpenAI, Anthropic, AWS, GitHub, Stripe, and private keys, replacing them with redaction placeholders.
 - **Deterministic Token Budgeting (`-m`):** Estimates BPE subword tokens using cl100k/o200k calibrated heuristics and enforces hard budget ceilings.
-- **Model Context Protocol (MCP):** Connects to Claude Desktop, Codex, and Cursor as an stdio server with tools for repo mapping, symbol inspection, and diff analysis.
+- **Model Context Protocol (MCP):** Connects to OpenAI Codex, Cursor, and developer agents as an stdio server with tools for repo mapping, symbol inspection, and diff analysis.
 - **HTML Visualizer (`--html`):** Compiles an offline, single-file HTML report with token distribution statistics and code trees.
 - **Exclusion Engine:** Parses `.gitignore` and `.repofluxignore` alongside standard build and binary file exclusions.
 
@@ -113,7 +113,7 @@ Automate incoming pull request reviews in CI using repoflux and the OpenAI API:
 
 ## Model Context Protocol (MCP) Configuration
 
-For agentic IDEs (Cursor, Claude Desktop, and MCP-compatible coding agents), connect repoflux as a native stdio server:
+For agentic IDEs and OpenAI coding assistants (such as Cursor or MCP-enabled agents), add repoflux to your MCP configuration file:
 
 ```json
 {

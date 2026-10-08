@@ -24,7 +24,7 @@
     "repomix",
     "token-optimizer",
     "cursor",
-    "claude"
+    "openai"
   ],
   "author": "apple sauce",
   "license": "MIT",
