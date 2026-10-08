@@ -4,6 +4,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { packRepository, OutputFormat } from './core/packer.js';
 import { startMcpServer } from './mcp/server.js';
+import { copyToClipboard } from './core/clipboard.js';
 
 interface CliArgs {
   targetDir: string;
@@ -11,6 +12,7 @@ interface CliArgs {
   format: OutputFormat;
   maxTokens?: number;
   treeOnly: boolean;
+  clipboard: boolean;
   mcp: boolean;
   noSecretsRedaction: boolean;
   help: boolean;
@@ -22,6 +24,7 @@ function parseArgs(args: string[]): CliArgs {
     targetDir: '.',
     format: 'xml',
     treeOnly: false,
+    clipboard: false,
     mcp: false,
     noSecretsRedaction: false,
     help: false,
@@ -39,6 +42,8 @@ function parseArgs(args: string[]): CliArgs {
       result.mcp = true;
     } else if (arg === '--tree' || arg === '-t') {
       result.treeOnly = true;
+    } else if (arg === '--clipboard' || arg === '-c') {
+      result.clipboard = true;
     } else if (arg === '--no-redact') {
       result.noSecretsRedaction = true;
     } else if (arg === '--format' || arg === '-f') {
@@ -71,6 +76,7 @@ function printHelp() {
   -f, --format <format>   Output format: xml, markdown, json (default: xml)
   -m, --max-tokens <num>  Cap context budget at N tokens
   -t, --tree              Only generate directory tree with token distribution
+  -c, --clipboard         Copy generated context directly to clipboard
       --mcp               Run as a Model Context Protocol stdio server for Claude/Cursor
       --no-redact         Disable automatic secret / API key redaction
   -h, --help              Show help information
@@ -78,6 +84,7 @@ function printHelp() {
 
 \x1b[1mEXAMPLES:\x1b[0m
   $ npx repoflux                     # Bundle current repo into repoflux-output.xml
+  $ npx repoflux -c                  # Bundle and copy directly to clipboard
   $ npx repoflux --tree              # Inspect token footprint per file
   $ npx repoflux -f markdown -o ctx.md # Pack as clean Markdown
   $ npx repoflux --mcp               # Connect to Claude Desktop or Cursor MCP
@@ -93,7 +100,7 @@ async function main() {
   }
 
   if (args.version) {
-    console.log('1.0.0');
+    console.log('1.1.0');
     process.exit(0);
   }
 
@@ -132,6 +139,16 @@ async function main() {
 
   console.log(`\x1b[32m✔ Bundled ${result.totalFiles} files into \x1b[1m${path.basename(outPath)}\x1b[0m (${(result.totalBytes / 1024).toFixed(1)} KB)`);
   console.log(`\x1b[36m📊 Estimated context size:\x1b[0m ~${result.totalTokens.toLocaleString()} tokens`);
+
+  if (args.clipboard) {
+    const copied = await copyToClipboard(result.output);
+    if (copied) {
+      console.log(`\x1b[35m📋 Copied context directly to system clipboard!\x1b[0m`);
+    } else {
+      console.log(`\x1b[33m⚠️ Could not access system clipboard\x1b[0m`);
+    }
+  }
+
   console.log(`\x1b[90m⏱ Completed in ${elapsed}ms\x1b[0m`);
 
   if (result.budgetExceeded) {

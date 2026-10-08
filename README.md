@@ -47,11 +47,12 @@ npm install -g repoflux
 ## ✨ Features
 
 - 🏎️ **Zero-Dependency Core:** Pure TypeScript engine running at sub-60ms speeds across multi-thousand file repositories.
+- 📋 **Direct Clipboard Integration:** Use `-c` / `--clipboard` to instantly copy bundled prompt context directly to system clipboard.
 - 🔒 **Automated Secret Redaction:** Automatically detects and redacts OpenAI, Anthropic, AWS, Slack, GitHub, Stripe tokens, JWTs, and private keys before LLMs see them.
 - 📊 **Token-Aware Tree:** Visualizes file weights and distribution so you can trim bloated files before pasting into ChatGPT/Codex.
 - 🎯 **Token Budgeting:** Specify `--max-tokens` to guarantee your bundle never exceeds model context windows (e.g., 32k, 128k, 200k).
 - 🧩 **Native MCP Server:** Run `repoflux --mcp` to expose `get_repo_map`, `pack_codebase`, and `audit_secrets` directly to Claude Desktop & Cursor.
-- 🛡️ **Intelligent .gitignore:** Automatically respects `.gitignore` rules and rejects binary files, lockfiles, node_modules, and build outputs.
+- 🛡️ **Intelligent .gitignore & .repofluxignore:** Automatically respects exclusions and rejects binary files, lockfiles, node_modules, and build outputs.
 
 ---
 
@@ -60,6 +61,7 @@ npm install -g repoflux
 | Flag | Short | Description | Default |
 |---|---|---|---|
 | `--out` | `-o` | Output file path | `repoflux-output.<format>` |
+| `--clipboard` | `-c` | Copy context bundle directly to system clipboard | `false` |
 | `--format` | `-f` | Format (`xml`, `markdown`, `json`) | `xml` |
 | `--max-tokens` | `-m` | Maximum context token budget limit | Unlimited |
 | `--tree` | `-t` | Print directory tree with token allocations | `false` |

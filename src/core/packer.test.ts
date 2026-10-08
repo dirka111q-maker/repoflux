@@ -36,3 +36,21 @@ test('packRepository packages directory into structured XML', async () => {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
 });
+
+test('IgnoreFilter respects .repofluxignore', async () => {
+  const tempDir = path.join(process.cwd(), '.test_fixture_ignore');
+  fs.mkdirSync(tempDir, { recursive: true });
+  fs.writeFileSync(path.join(tempDir, 'keep.ts'), 'export const keep = 1;');
+  fs.writeFileSync(path.join(tempDir, 'skip.secret'), 'hidden stuff');
+  fs.writeFileSync(path.join(tempDir, '.repofluxignore'), '*.secret');
+
+  try {
+    const result = await packRepository({ rootDir: tempDir });
+    assert.strictEqual(result.totalFiles, 1);
+    assert.ok(result.output.includes('keep.ts'));
+    assert.ok(!result.output.includes('skip.secret'));
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+});
+

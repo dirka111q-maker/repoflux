@@ -14,6 +14,7 @@ const DEFAULT_IGNORE_PATTERNS = [
   'coverage',
   '.nyc_output',
   '*.log',
+  '.repofluxignore',
   '.DS_Store',
   'Thumbs.db',
   'package-lock.json',
@@ -56,14 +57,14 @@ export class IgnoreFilter {
 
   constructor(rootDir: string) {
     this.addPatterns(DEFAULT_IGNORE_PATTERNS);
-    this.loadGitignore(rootDir);
+    this.loadFile(path.join(rootDir, '.gitignore'));
+    this.loadFile(path.join(rootDir, '.repofluxignore'));
   }
 
-  private loadGitignore(rootDir: string) {
-    const gitignorePath = path.join(rootDir, '.gitignore');
-    if (fs.existsSync(gitignorePath)) {
+  private loadFile(filePath: string) {
+    if (fs.existsSync(filePath)) {
       try {
-        const content = fs.readFileSync(gitignorePath, 'utf8');
+        const content = fs.readFileSync(filePath, 'utf8');
         const lines = content.split('\n');
         for (const line of lines) {
           const trimmed = line.trim();
